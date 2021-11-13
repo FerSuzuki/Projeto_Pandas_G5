@@ -29,7 +29,7 @@ def receber_bases():
     df_demografico = pd.read_csv(folder_class_path + '/1_demografico.csv', sep=';', encoding='utf-8-sig')
     df_renda_gastos = pd.read_csv(folder_class_path + '/2_renda_gastos.csv', sep=';', encoding='utf-8-sig')
     df_bens = pd.read_csv(folder_class_path + '/3_bens.csv', sep=';', encoding='utf-8-sig')
-
+    
     return df_demografico, df_renda_gastos, df_bens
 
 
@@ -39,7 +39,7 @@ def unificar_bases(df_demografico, df_renda_gastos, df_bens):
     df_unificado = df_demografico.merge(df_renda_gastos, how='inner')
     # É preciso utilizar ambos os index como chaves para se tornar interno
     df_unificado = df_unificado.merge(df_bens, left_index=True, right_index=True)
-
+    
     return df_unificado
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -49,12 +49,11 @@ def unificar_bases(df_demografico, df_renda_gastos, df_bens):
 # Função para criar o relatório de variáveis quantitativas
 def criar_relatorio_geral(df_unificado):
     # Receber os valores estatísticos da função describe
-    df_relatorio = df_unificado.describe()
+    df_relatorio = df_unificado.describe().T.sort_index()
     # Remover as colunas qualitativas, mas que contém números e devem ser desconsideradas
-    idex_drop = ['count', 'std', '50%']
-    columns_drop = ['ID', 'Agricultural Household indicator', 'Electricity']
-    df_relatorio.drop(index=idex_drop, columns=columns_drop, inplace=True)
-    df_relatorio = df_relatorio.transpose()
+    columns_drop = ['count', 'std', '50%']
+    index_drop = ['ID', 'Agricultural Household indicator', 'Electricity']
+    df_relatorio.drop(index=index_drop, columns=columns_drop, inplace=True)
 
     # Calcular a métrica faltante da mediana
     df_relatorio['median'] = calcula_mediana(df_unificado, df_relatorio.index.values)
@@ -62,7 +61,7 @@ def criar_relatorio_geral(df_unificado):
     # Reordenar as colunas e devolver o DataFrame
     columns_order = ['min', '25%', 'median', '75%', 'max', 'mean']
     df_relatorio = df_relatorio[columns_order]
-
+    
     return round(df_relatorio, 3)
 
 
@@ -71,6 +70,7 @@ def calcula_mediana(df_unificado, colunas_qualitativas):
     serie_mediana = []
     for coluna in colunas_qualitativas:
         serie_mediana.append(df_unificado[coluna].median())
+    
     return serie_mediana
 
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -78,6 +78,8 @@ def calcula_mediana(df_unificado, colunas_qualitativas):
 # ------------------------------------------------- Tarefa 3 --------------------------------------------------------- #
 
 # Função para remoção dos Outliers
+
+
 
 # -------------------------------------------------------------------------------------------------------------------- #
 
