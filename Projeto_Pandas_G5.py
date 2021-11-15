@@ -1,7 +1,6 @@
 import os
 import numpy as np
 import pandas as pd
-from argparse import ArgumentParser
 from datetime import date, datetime, timedelta
 
 # Definir o caminho da pasta em que o projeto se encontra
@@ -37,6 +36,12 @@ def main():
     # Tarefa 6
     cria_csv_alta_renda(df_unificado)
     pd.options.mode.chained_assignment = 'warn'
+
+    # Tarefa 7
+    df_dummies = criar_dummies(df_unificado, qtd_colunas)
+
+    # Tarefa 8
+    comparar_medias(df_unificado, 3)
 
 
 # ------------------------------------------------- Tarefa 1 --------------------------------------------------------- #
@@ -91,7 +96,7 @@ def calcula_mediana(df_unificado, colunas_qualitativas):
 
 # -------------------------------------------------------------------------------------------------------------------- #
 
-# ----------------------------------------------- Tarefa 3 e 4 ------------------------------------------------------- #
+# ------------------------------------------------- Tarefa 3 e 4--------------------------------------------------------- #
 
 # Função para remoção dos Outliers
 def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
@@ -99,12 +104,8 @@ def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
     median = df_unificado.median()
 
     # Resumir somente as colunas com dados numéricos
-    df_unificado = df_unificado.select_dtypes(include=np.number)
-
-    # Definir as colunas qualitativas que se utilizam de variáveis numéricas para que sejam excluídas 
-    colunas_drop = ['ID', 'Agricultural Household indicator', 'Electricity']
-    df_unificado.drop(columns=colunas_drop, inplace=True)
-
+    df_unificado = criar_df_quantitativo(df_unificado)
+    
     # Agora, para as colunas restantes é preciso tratar os outliers (remover ou trocar pela mediana)
     for coluna in df_unificado.columns:
         df_unificado.loc[:, coluna] = tratar_outliers(df_unificado[coluna])
@@ -127,6 +128,15 @@ def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
     df_relatorio_sem_outlier = df_relatorio_sem_outlier[columns_order]
 
     return round(df_relatorio_sem_outlier, 3)
+
+# Resumir somente as colunas com dados numéricos
+def criar_df_quantitativo(df_unificado):
+    df_unificado = df_unificado.select_dtypes(include=np.number)
+
+    # Definir as colunas qualitativas que se utilizam de variáveis numéricas para que sejam excluídas 
+    colunas_drop = ['ID', 'Agricultural Household indicator', 'Electricity']
+    df_unificado.drop(columns=colunas_drop, inplace=True)
+    return df_unificado
 
 # Função para tratar os outliers da coluna em análise do DataFrame
 def tratar_outliers(serie_coluna):
@@ -206,27 +216,41 @@ def calcular_frequencia(df_unificado, coluna, variavel_quali, numero_linhas):
 
 # Função para criar um arquivo csv que resume somente os dados que a renda esteja entre os 10% maiores da base
 def cria_csv_alta_renda(df_unificado):
-    quantil_90 = df_unificado['Total Household Income'].quantile(0.9)
-    mascara_alta_renda = df_unificado['Total Household Income'] > quantil_90
+    mascara_alta_renda, _ = pegar_quantil_renda(df_unificado)
 
     df_alta_renda = df_unificado.loc[mascara_alta_renda].sort_values(by='Total Household Income', ascending=False)
     df_alta_renda.reset_index(drop=True,inplace=True)
     df_alta_renda.to_csv(folder_class_path + '/dados_alta_renda.csv', sep=';', encoding='utf-8-sig')
 
+def pegar_quantil_renda(df_unificado):
+    quantil_90 = df_unificado['Total Household Income'].quantile(0.9)
+    mascara_alta_renda = df_unificado['Total Household Income'] > quantil_90
+    return mascara_alta_renda, 
 
 # -------------------------------------------------------------------------------------------------------------------- #
 
 # ------------------------------------------------- Tarefa 7 --------------------------------------------------------- #
+def criar_dummies(df_unificado, qtd_colunas):
+    colunas_qualitativas = pegar_colunas_qualitativas(df_unificado)
+    df_dummies = pd.get_dummies(df_unificado, columns=colunas_qualitativas[:qtd_colunas])
+    df_dummies.drop(columns=colunas_qualitativas, errors='ignore',inplace=True)
+    
+    return df_dummies
+
+# -------------------------------------------------------------------------------------------------------------------- #
+
+# ------------------------------------------------- Tarefa 8 --------------------------------------------------------- #
+def comparar_medias(df_unificado, qtd_colunas_qualitativas):
+    df_dummies = criar_dummies(df_unificado, qtd_colunas_qualitativas)
+    df_dummies = insere_coluna_classificacao_renda(df_dummies, df_unificado)
+
+    display(df_dummies.groupby('classificacao_mais_ricos').mean().style.format('{:.2f}').highlight_max(color='green'))
 
 
+def insere_coluna_classificacao_renda(df_dummies, df_unificado):
+    df_dummies['classificacao_mais_ricos'] = pegar_quantil_renda(df_unificado)
+    df_dummies.loc[df_dummies['classificacao_mais_ricos'] == True, 'classificacao_mais_ricos'] = 'Renda Acima de 10%'
+    df_dummies.loc[df_dummies['classificacao_mais_ricos'] == False, 'classificacao_mais_ricos'] = 'Demais Rendas'
+    return df_dummies
 
-
-
-# Definir os argumentos que o programa pode receber
-parser = ArgumentParser()
-parser.add_argument('-to', '--tipo_operacao', type=str,
-                    help='Define o tipo de operação que será realizada: Requisição API BBCE ou Enviar os dados ao BD',
-                    default='api')
-
-if __name__ == '__main__':
-    main()
+# -------------------------------------------------------------------------------------------------------------------- #
