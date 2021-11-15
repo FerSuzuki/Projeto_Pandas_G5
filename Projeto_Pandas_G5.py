@@ -32,7 +32,7 @@ def main():
     df_relatorio_outlier_tratado = criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='tratar')
     
     # Tarefa 5
-    criar_relatorio_sem_outlier(df_unificado)
+    criar_relatorio_colunas_qualitativas(df_unificado)
     
     # Tarefa 6
     cria_csv_alta_renda(df_unificado)
@@ -93,8 +93,11 @@ def calcula_mediana(df_unificado, colunas_qualitativas):
 
 # ----------------------------------------------- Tarefa 3 e 4 ------------------------------------------------------- #
 
-# Função para tratamento dos Outliers
+# Função para remoção dos Outliers
 def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
+    # Definir a séire de medianas do DataFrame
+    median = df_unificado.median()
+
     # Resumir somente as colunas com dados numéricos
     df_unificado = df_unificado.select_dtypes(include=np.number)
 
@@ -104,7 +107,12 @@ def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
 
     # Agora, para as colunas restantes é preciso tratar os outliers (remover ou trocar pela mediana)
     for coluna in df_unificado.columns:
-        df_unificado.loc[:, coluna] = tratar_outliers(df_unificado[coluna], opcao_tratar_outlier)
+        df_unificado.loc[:, coluna] = tratar_outliers(df_unificado[coluna])
+    
+    # Para a opção de resolver os outliers com a mediana em vez de deixar vazio
+    if opcao_tratar_outlier != 'remover':
+        for column in df_unificado.columns:
+            df_unificado[column].fillna(median[column],inplace=True)
    
     # Criar o DataFrame de relatório a partir do DF de dados
     df_relatorio_sem_outlier = df_unificado.describe().T.sort_index()
@@ -121,42 +129,36 @@ def criar_relatorio_sem_outlier(df_unificado, opcao_tratar_outlier='remover'):
     return round(df_relatorio_sem_outlier, 3)
 
 # Função para tratar os outliers da coluna em análise do DataFrame
-def tratar_outliers(serie_coluna, opcao_tratar_outlier):
+def tratar_outliers(serie_coluna):
     q1 = np.percentile(serie_coluna, 25)
     q3 = np.percentile(serie_coluna, 75)
     delta_outlier = 1.5*(q3 - q1)
     
-    if opcao_tratar_outlier == 'remover':
-        serie_coluna_outlier_tratado = serie_coluna.apply(lambda x: aplicar_metodo_tuckey(q1, q3, delta_outlier, x))
-    else:
-        mediana = serie_coluna.median()
-        serie_coluna_outlier_tratado = serie_coluna.apply(lambda x: aplicar_metodo_tuckey(q1, q3, delta_outlier, x, mediana))
+    serie_coluna_outlier_tratado = serie_coluna.apply(lambda x: aplicar_metodo_tuckey(q1, q3, delta_outlier, x))
 
     return serie_coluna_outlier_tratado
 
 # Função para aplicar o método de Tuckey e avaliar se o dado analisado é outlier ou não
-def aplicar_metodo_tuckey(q1, q3, delta_outlier, valor, mediana='desconsiderar'):
+def aplicar_metodo_tuckey(q1, q3, delta_outlier, valor):
     # Cálculo de outlier através do Método Tuckey
     eh_outlier_menor = valor < q1 - delta_outlier 
     eh_outlier_maior = valor > q3 + delta_outlier
+    
+    # Se o valor for outlier é necessário deixar o valor vazio
     if eh_outlier_menor or eh_outlier_maior:
-        # Verificar se a opção do usuário é remover o outlier ou trocar pela sua mediana
-        if mediana == 'desconsiderar':
-            valor_novo = np.nan
-        else:
-            valor_novo = mediana
+        valor_novo = np.nan
     else:
         # Caso do valor não ser outlier
         valor_novo = valor
 
     return valor_novo
-
+    
 # -------------------------------------------------------------------------------------------------------------------- #
 
 # ------------------------------------------------- Tarefa 5 --------------------------------------------------------- #
 
 # Função para criar um relatório para as variáveis qualitativas
-def criar_relatorio_sem_outlier(df_unificado):
+def criar_relatorio_colunas_qualitativas(df_unificado):
     shapes = df_unificado.shape
     colunas_qualitativas = pegar_colunas_qualitativas(df_unificado)
 
